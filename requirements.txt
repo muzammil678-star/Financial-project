@@ -1,6 +1,8 @@
 flask
-mysql-connector-python
-python-dotenv
-numpy
 pandas
+numpy
 matplotlib
+sqlalchemy
+pymysql
+cryptography
+python-dotenv

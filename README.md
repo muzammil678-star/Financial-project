@@ -4,7 +4,7 @@ Small database + API backend built with Flask and MySQL.
 
 
 ## Team members are:
-   Shaik Muzammil
+   Shaik Muzammil 
    P.Phani Babu
    Pathan Kamal Ahmed
    Sai Ram
