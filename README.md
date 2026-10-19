@@ -1,9 +1,17 @@
-# Financial Project
+# Financial Risk Analysis and Risk Management
 
 Small database + API backend built with Flask and MySQL.
 
-## Setup
 
+## Team members are:
+   Shaik Muzammil
+   P.Phani Babu
+   Pathan Kamal Ahmed
+   Sai Ram
+   Sake Akshaya
+
+
+## Setup  For teammates only
 1. Install MySQL Server and MySQL Workbench
 2. Create the database in Workbench: `CREATE DATABASE finance_db;`
 3. Create a virtual environment: `python -m venv .venv`
@@ -14,7 +22,7 @@ Small database + API backend built with Flask and MySQL.
 8. Start the app: `python app.py`
 9. Open http://127.0.0.1:5000/ in your browser. You should see `{"status":"API is running"}`
 
-## Team rules
+## Team mates Notice this
 
 - Never push directly to `main`. Create a branch, push it, and open a Pull Request
 - Never commit `.env`
