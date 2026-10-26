@@ -1,3 +1,5 @@
+import logging
+import os
 from datetime import datetime
 from decimal import Decimal
 
@@ -8,6 +10,25 @@ from sqlalchemy import text
 from db import engine
 
 app = Flask(__name__)
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+access_logger = logging.getLogger("access")
+access_logger.setLevel(logging.INFO)
+if not access_logger.handlers:
+    handler = logging.FileHandler(os.path.join(LOG_DIR, "access.log"))
+    handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    access_logger.addHandler(handler)
+
+
+@app.after_request
+def log_access(response):
+    access_logger.info(
+        "%s user=%s %s %s -> %s",
+        request.remote_addr, current_user(), request.method,
+        request.full_path.rstrip("?"), response.status_code,
+    )
+    return response
 
 REVIEW_STATUSES = ("PENDING", "UNDER_REVIEW", "CLEARED", "ESCALATED")
 ALERT_CUTOFF = 35   # score needed to flag a transaction for review
