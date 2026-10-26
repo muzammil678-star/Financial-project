@@ -393,4 +393,4 @@ def list_audit_log():
     return jsonify([clean(r) for r in rows])
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
