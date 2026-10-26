@@ -40,8 +40,11 @@ ts = df["ts"].to_numpy()
 freq = np.zeros(len(df), dtype=int)
 for idx in df.groupby("account_id").indices.values():
     t = ts[idx]
-    freq[idx] = (np.searchsorted(t, t + 600, side="right")
-                 - np.searchsorted(t, t - 600, side="left"))
+    freq[idx] = (
+    np.arange(len(t))
+    - np.searchsorted(t, t - 600, side="left")
+    + 1
+)
 df["freq10"] = freq
 f_freq = df["freq10"] >= T["HIGH_FREQUENCY"]
 
@@ -94,3 +97,18 @@ print("Normal transactions flagged (false positives):", fp)
 print("Planted anomalies missed (false negatives):", fn)
 print("Precision:", round(tp / max(tp + fp, 1) * 100, 1), "%")
 print("Recall:", round(tp / max(tp + fn, 1) * 100, 1), "%")
+
+tn = int((~flagged & ~planted).sum())
+
+precision = tp / max(tp + fp, 1)
+recall = tp / max(tp + fn, 1)
+f1 = 2 * precision * recall / max(precision + recall, 1e-10)
+
+print("\nEVALUATION REPORT")
+print("True Positives:", tp)
+print("True Negatives:", tn)
+print("False Positives:", fp)
+print("False Negatives:", fn)
+print("Precision:", round(precision, 3))
+print("Recall:", round(recall, 3))
+print("F1 Score:", round(f1, 3))
