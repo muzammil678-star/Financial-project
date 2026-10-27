@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from decimal import Decimal
 
+from flask import send_from_directory
 import numpy as np
 from flask import Flask, jsonify, request
 from sqlalchemy import text
@@ -392,5 +393,25 @@ def list_audit_log():
         rows = conn.execute(sql, {"limit": get_limit(50, 500)}).mappings().all()
     return jsonify([clean(r) for r in rows])
 
+@app.get("/charts/risk-distribution")
+def risk_distribution_chart():
+    return send_from_directory(
+        "reports", "risk_distribution.png"
+    )
+
+
+@app.get("/charts/alert-trend")
+def alert_trend_chart():
+    return send_from_directory(
+        "reports", "alert_trend.png"
+    )
+
+
+@app.get("/charts/alerts-by-rule")
+def alerts_by_rule_chart():
+    return send_from_directory(
+        "reports", "alerts_by_rule.png"
+    )
+
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(debug=True)
