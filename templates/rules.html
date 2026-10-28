@@ -6,26 +6,20 @@
   <title>Rules</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-  <script src="{{ url_for('static', filename='app.js') }}"></script>
 <body>
   <header>
     <h1>Financial Risk Review Dashboard</h1>
-    <nav>
-      <a href="/ui">Dashboard</a>
-      <a href="/ui/alerts">Alerts</a>
-      <a href="/ui/transactions">Transactions</a>
-      <a href="/ui/check">Check transaction</a>
-      <a href="/ui/rules">Rules</a>
-      <a href="/ui/audit">Audit log</a>
-    </nav>
+    {% include "_nav.html" %}
   </header>
   <main>
     <h2>Rules and weights</h2>
     <p class="note">Risk score = sum of the weights of the rules that fire (maximum 100).
-      A score of 35 or more creates an alert. A score of 65 or more is HIGH.</p>
+      A score of 35 or more creates an alert. A score of 65 or more is HIGH.
+      New transactions use changes immediately. To re-score existing transactions, run
+      <code>python scripts/run_rules.py</code>.</p>
     <table id="rulesTable">
       <thead>
-        <tr><th>Rule</th><th>Weight</th><th>Threshold</th><th>Description</th><th>Active</th></tr>
+        <tr><th>Rule</th><th>Weight</th><th>Threshold</th><th>Description</th><th>Active</th><th></th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -42,15 +36,42 @@
       const res = await fetch("/rules");
       const rows = await res.json();
       document.querySelector("#rulesTable tbody").innerHTML = rows.map(r => `
-        <tr>
-          <td>${esc(r.rule_name)}</td>
-          <td>${r.weight}</td>
-          <td>${r.threshold}</td>
+        <tr data-name="${esc(r.rule_name)}">
+          <td><b>${esc(r.rule_name)}</b></td>
+          <td><input type="number" class="w" min="0" max="100" step="1" value="${r.weight}"></td>
+          <td><input type="number" class="t" min="0" step="0.01" value="${r.threshold ?? ""}"></td>
           <td>${esc(r.description)}</td>
-          <td>${r.is_active ? "Yes" : "No"}</td>
+          <td><input type="checkbox" class="a" ${r.is_active ? "checked" : ""}></td>
+          <td><button class="save">Save</button></td>
         </tr>`).join("");
     }
+
+    document.querySelector("#rulesTable tbody").addEventListener("click", async (e) => {
+      if (!e.target.classList.contains("save")) return;
+      const row = e.target.closest("tr");
+      const body = {
+        weight: parseInt(row.querySelector(".w").value),
+        is_active: row.querySelector(".a").checked
+      };
+      const t = row.querySelector(".t").value;
+      if (t !== "") body.threshold = parseFloat(t);
+
+      const res = await fetch("/rules/" + encodeURIComponent(row.dataset.name), {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json", "X-User": "reviewer"},
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast("Rule updated");
+        load();
+      } else {
+        showToast(data.errors ? data.errors.join(", ") : data.error, "error");
+      }
+    });
+
     load();
   </script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

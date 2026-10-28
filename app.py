@@ -1,8 +1,10 @@
+import csv
+import io
 import logging
 import os
 from datetime import datetime
 from decimal import Decimal
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template,Response
 from flask import send_from_directory
 import numpy as np
 from flask import Flask, jsonify, request
@@ -413,6 +415,204 @@ def alerts_by_rule_chart():
         "reports", "alerts_by_rule.png"
     )
 
+# ---------- 1. GET /accounts ----------
+@app.get("/accounts")
+# or: @app.route("/accounts")
+def list_accounts():
+    sql = text("""
+        SELECT a.account_id, a.customer_id, c.customer_code
+        FROM accounts a
+        JOIN customers c ON c.customer_id = a.customer_id
+        ORDER BY a.account_id
+        LIMIT :limit
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"limit": get_limit(50, 500)}).mappings().all()
+    return jsonify([clean(r) for r in rows])
+
+
+# ---------- 2. GET /accounts/<id> ----------
+@app.get("/accounts/<int:account_id>")
+# or: @app.route("/accounts/<int:account_id>")
+def get_account(account_id):
+    with engine.connect() as conn:
+        account = conn.execute(text("""
+            SELECT a.account_id, a.customer_id, c.customer_code
+            FROM accounts a
+            JOIN customers c ON c.customer_id = a.customer_id
+            WHERE a.account_id = :id
+        """), {"id": account_id}).mappings().first()
+        if account is None:
+            return jsonify(error="Account not found"), 404
+
+        stats = conn.execute(text("""
+            SELECT COUNT(*) AS transactions, AVG(amount) AS avg_amount,
+                   MAX(amount) AS max_amount,
+                   MIN(transaction_datetime) AS first_transaction,
+                   MAX(transaction_datetime) AS last_transaction
+            FROM transactions
+            WHERE account_id = :id
+        """), {"id": account_id}).mappings().first()
+
+        regions = conn.execute(text("""
+            SELECT region, COUNT(*) AS transactions
+            FROM transactions
+            WHERE account_id = :id
+            GROUP BY region
+            ORDER BY transactions DESC
+        """), {"id": account_id}).mappings().all()
+
+        alerts = conn.execute(text("""
+            SELECT a.review_status, COUNT(*) AS alerts
+            FROM alerts a
+            JOIN transactions t ON t.transaction_id = a.transaction_id
+            WHERE t.account_id = :id
+            GROUP BY a.review_status
+        """), {"id": account_id}).mappings().all()
+
+    stats = clean(stats)
+    if stats["avg_amount"] is not None:
+        stats["avg_amount"] = round(stats["avg_amount"], 2)
+    return jsonify(
+        account=clean(account),
+        stats=stats,
+        regions=[clean(r) for r in regions],
+        alerts_by_status=[clean(r) for r in alerts],
+    )
+
+
+# ---------- 3. GET /alerts/<id>/history ----------
+@app.get("/alerts/<int:alert_id>/history")
+# or: @app.route("/alerts/<int:alert_id>/history")
+def alert_history(alert_id):
+    with engine.connect() as conn:
+        if fetch_alert(conn, alert_id) is None:
+            return jsonify(error="Alert not found"), 404
+        rows = conn.execute(text("""
+            SELECT log_id, user_name, action, details, created_at
+            FROM audit_log
+            WHERE entity = 'alert' AND entity_id = :id
+            ORDER BY created_at, log_id
+        """), {"id": str(alert_id)}).mappings().all()
+    return jsonify([clean(r) for r in rows])
+
+
+# ---------- 4. PATCH /rules/<name> ----------
+@app.patch("/rules/<rule_name>")
+# or: @app.route("/rules/<rule_name>", methods=["PATCH"])
+def update_rule(rule_name):
+    body = request.get_json(silent=True) or {}
+    changes, errors = [], []
+    params = {"name": rule_name}
+
+    if "weight" in body:
+        w = body["weight"]
+        if isinstance(w, bool) or not isinstance(w, int) or not 0 <= w <= 100:
+            errors.append("weight must be a whole number from 0 to 100")
+        else:
+            changes.append("weight = :weight")
+            params["weight"] = w
+    if "threshold" in body:
+        th = body["threshold"]
+        if isinstance(th, bool) or not isinstance(th, (int, float)) or th < 0:
+            errors.append("threshold must be a number of 0 or more")
+        else:
+            changes.append("threshold = :threshold")
+            params["threshold"] = th
+    if "is_active" in body:
+        if not isinstance(body["is_active"], bool):
+            errors.append("is_active must be true or false")
+        else:
+            changes.append("is_active = :active")
+            params["active"] = 1 if body["is_active"] else 0
+
+    if errors:
+        return jsonify(errors=errors), 400
+    if not changes:
+        return jsonify(error="Send weight, threshold or is_active"), 400
+
+    select_sql = text("SELECT rule_name, weight, threshold, description, is_active "
+                      "FROM rule_config WHERE rule_name = :name")
+    with engine.begin() as conn:
+        before = conn.execute(select_sql, {"name": rule_name}).mappings().first()
+        if before is None:
+            return jsonify(error="Rule not found"), 404
+        conn.execute(text("UPDATE rule_config SET " + ", ".join(changes)
+                          + " WHERE rule_name = :name"), params)
+        after = conn.execute(select_sql, {"name": rule_name}).mappings().first()
+        audit(conn, "RULE_UPDATE", "rule", rule_name,
+              f"weight {before['weight']}->{after['weight']}, "
+              f"threshold {float(before['threshold'] or 0)}->{float(after['threshold'] or 0)}, "
+              f"active {before['is_active']}->{after['is_active']}")
+    return jsonify(clean(after))
+
+
+# ---------- 5. GET /reports/alerts-by-rule ----------
+@app.get("/reports/alerts-by-rule")
+# or: @app.route("/reports/alerts-by-rule")
+def alerts_by_rule():
+    sql = text("""
+        SELECT rule_name, COUNT(*) AS alerts, AVG(risk_score) AS avg_score
+        FROM alerts
+        GROUP BY rule_name
+        ORDER BY alerts DESC
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(sql).mappings().all()
+    result = [clean(r) for r in rows]
+    for r in result:
+        r["avg_score"] = round(r["avg_score"], 1)
+    return jsonify(result)
+
+
+# ---------- 6. GET /reports/evaluation ----------
+@app.get("/reports/evaluation")
+# or: @app.route("/reports/evaluation")
+def evaluation():
+    sql = text("""
+        SELECT
+          SUM(CASE WHEN t.is_planted_anomaly = 1 AND f.transaction_id IS NOT NULL THEN 1 ELSE 0 END) AS true_positives,
+          SUM(CASE WHEN t.is_planted_anomaly = 0 AND f.transaction_id IS NOT NULL THEN 1 ELSE 0 END) AS false_positives,
+          SUM(CASE WHEN t.is_planted_anomaly = 1 AND f.transaction_id IS NULL THEN 1 ELSE 0 END) AS false_negatives,
+          SUM(CASE WHEN t.is_planted_anomaly = 0 AND f.transaction_id IS NULL THEN 1 ELSE 0 END) AS true_negatives
+        FROM transactions t
+        LEFT JOIN (SELECT DISTINCT transaction_id FROM alerts) f
+               ON f.transaction_id = t.transaction_id
+    """)
+    with engine.connect() as conn:
+        row = conn.execute(sql).mappings().first()
+    tp, fp = int(row["true_positives"] or 0), int(row["false_positives"] or 0)
+    fn, tn = int(row["false_negatives"] or 0), int(row["true_negatives"] or 0)
+    precision = tp / max(tp + fp, 1)
+    recall = tp / max(tp + fn, 1)
+    f1 = 2 * precision * recall / max(precision + recall, 1e-9)
+    return jsonify(
+        true_positives=tp, false_positives=fp,
+        false_negatives=fn, true_negatives=tn,
+        precision_pct=round(precision * 100, 1),
+        recall_pct=round(recall * 100, 1),
+        f1_pct=round(f1 * 100, 1),
+        note="Planted anomalies exist only in the synthetic data; this is an evaluation aid.",
+    )
+
+
+# ---------- 7. GET /export/alerts.csv ----------
+@app.get("/export/alerts.csv")
+# or: @app.route("/export/alerts.csv")
+def export_alerts():
+    sql = ALERT_SQL + " ORDER BY a.risk_score DESC, a.alert_id"
+    with engine.connect() as conn:
+        rows = [clean(r) for r in conn.execute(text(sql)).mappings().all()]
+    columns = ["alert_id", "transaction_id", "account_id", "transaction_datetime",
+               "amount", "region", "rule_name", "risk_score", "review_status",
+               "reason", "created_at"]
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=columns, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    return Response(out.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=alerts.csv"})
+
 @app.get("/ui")
 # or: @app.route("/ui")
 def ui_home():
@@ -444,6 +644,16 @@ def ui_rules():
 # or: @app.route("/ui/audit")
 def ui_audit():
     return render_template("audit.html")
+
+@app.get("/ui/evaluation")
+# or: @app.route("/ui/evaluation")
+def ui_evaluation():
+    return render_template("evaluation.html")
+
+@app.get("/ui/account")
+# or: @app.route("/ui/account")
+def ui_account():
+    return render_template("account.html")
 
 if __name__ == "__main__":
     app.run(debug=True)

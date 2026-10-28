@@ -10,14 +10,7 @@
 <body>
   <header>
     <h1>Financial Risk Review Dashboard</h1>
-    <nav>
-  <a href="/ui">Dashboard</a>
-  <a href="/ui/alerts">Alerts</a>
-  <a href="/ui/transactions">Transactions</a>
-  <a href="/ui/check">Check transaction</a>
-  <a href="/ui/rules">Rules</a>
-  <a href="/ui/audit">Audit log</a>
-</nav>
+        {% include "_nav.html" %}
   </header>
   <main>
     <label>Status:
@@ -29,6 +22,7 @@
         <option>ESCALATED</option>
       </select>
     </label>
+        <a class="button" href="/export/alerts.csv">Export CSV</a>
     <table id="alertsTable">
       <thead>
         <tr>
@@ -40,6 +34,15 @@
     </table>
   </main>
 
+
+
+    <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <button class="close" id="closeModal">&times;</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
   <script>
     const STATUSES = ["PENDING", "UNDER_REVIEW", "CLEARED", "ESCALATED"];
 
@@ -48,7 +51,47 @@
       d.textContent = v;
       return d.innerHTML;
     }
+       async function openDetail(id) {
+      const [alertRes, histRes] = await Promise.all([
+        fetch("/alerts/" + id), fetch("/alerts/" + id + "/history")
+      ]);
+      const a = await alertRes.json();
+      const hist = await histRes.json();
+      const level = a.risk_score >= 65 ? "HIGH" : "MEDIUM";
+      document.getElementById("modalBody").innerHTML = `
+        <h2>Alert ${a.alert_id} <span class="badge ${level}">${level}</span></h2>
+        <p><span class="chip ${esc(a.review_status)}">${esc(a.review_status.replace("_", " "))}</span>
+           Risk score <b>${a.risk_score}</b></p>
+        <dl>
+          <dt>Transaction</dt><dd>${a.transaction_id} (account ${a.account_id})</dd>
+          <dt>Time</dt><dd>${esc(a.transaction_datetime.replace("T", " "))}</dd>
+          <dt>Amount</dt><dd>${a.amount.toFixed(2)}</dd>
+          <dt>Region</dt><dd>${esc(a.region)}</dd>
+          <dt>Rules</dt><dd>${esc(a.rule_name)}</dd>
+          <dt>Reason</dt><dd>${esc(a.reason)}</dd>
+          <dt>Created</dt><dd>${esc(a.created_at.replace("T", " "))}</dd>
+        </dl>
+        <h3>Review history</h3>
+        ${hist.length
+          ? `<ul class="history">${hist.map(h =>
+              `<li><b>${esc(h.created_at.replace("T", " "))}</b> ${esc(h.user_name)}: ${esc(h.action)} ${esc(h.details)}</li>`
+            ).join("")}</ul>`
+          : "<p class='note'>No changes recorded yet.</p>"}`;
+      document.getElementById("modal").classList.remove("hidden");
+    }
 
+    document.querySelector("#alertsTable tbody").addEventListener("click", (e) => {
+      if (e.target.tagName === "SELECT" || e.target.tagName === "OPTION") return;
+      const tr = e.target.closest("tr");
+      if (tr && tr.dataset.id) openDetail(tr.dataset.id);
+    });
+
+    document.getElementById("closeModal").addEventListener("click", () => {
+      document.getElementById("modal").classList.add("hidden");
+    });
+    document.getElementById("modal").addEventListener("click", (e) => {
+      if (e.target.id === "modal") e.target.classList.add("hidden");
+    });
     async function loadAlerts() {
       const status = document.getElementById("statusFilter").value;
       const url = "/alerts?limit=50" + (status ? "&status=" + status : "");
@@ -61,6 +104,7 @@
           `<option ${s === a.review_status ? "selected" : ""}>${s}</option>`).join("");
         const tr = document.createElement("tr");
                 if (a.risk_score >= 65) tr.className = "high-row";
+                        tr.dataset.id = a.alert_id;
         tr.innerHTML = `
           <td>${a.alert_id}</td>
           <td>${a.account_id}</td>

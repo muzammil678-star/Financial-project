@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Financial Risk Review Dashboard</h1>
+    {% include "_nav.html" %}
+  </header>
+  <main>
+    <div class="panel filters">
+            <label>Account <select id="accountId"></select></label>
+      <button id="loadBtn">Load account</button>
+    </div>
+    <p id="message" class="error"></p>
+
+    <div id="content" class="hidden">
+      <h2 id="title"></h2>
+      <div class="cards plain">
+        <div class="card"><h2 id="txCount">-</h2><p>Transactions</p></div>
+        <div class="card"><h2 id="avgAmount">-</h2><p>Average amount</p></div>
+        <div class="card"><h2 id="maxAmount">-</h2><p>Largest amount</p></div>
+        <div class="card"><h2 id="alertCount">-</h2><p>Alerts</p></div>
+      </div>
+
+      <h3>Regions used</h3>
+      <table id="regionTable">
+        <thead><tr><th>Region</th><th>Transactions</th><th>Share</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <h3>Alerts by review status</h3>
+      <table id="statusTable">
+        <thead><tr><th>Status</th><th>Alerts</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <h3>Latest transactions</h3>
+      <table id="txTable">
+        <thead>
+          <tr><th>ID</th><th>Time</th><th>Amount</th><th>Type</th><th>Channel</th><th>Region</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    function esc(v) {
+      const d = document.createElement("div");
+      d.textContent = v;
+      return d.innerHTML;
+    }
+
+    async function loadAccount() {
+      const id = document.getElementById("accountId").value;
+      const msg = document.getElementById("message");
+      const content = document.getElementById("content");
+      msg.textContent = "";
+
+      const res = await fetch("/accounts/" + encodeURIComponent(id));
+      if (!res.ok) {
+        content.classList.add("hidden");
+        msg.textContent = "Account not found";
+        return;
+      }
+      const d = await res.json();
+      const total = d.stats.transactions;
+
+      document.getElementById("title").textContent =
+        "Account " + d.account.account_id + " (customer " + d.account.customer_code + ")";
+      document.getElementById("txCount").textContent = total;
+      document.getElementById("avgAmount").textContent = d.stats.avg_amount.toFixed(2);
+      document.getElementById("maxAmount").textContent = d.stats.max_amount.toFixed(2);
+      document.getElementById("alertCount").textContent =
+        d.alerts_by_status.reduce((sum, r) => sum + r.alerts, 0);
+
+      document.querySelector("#regionTable tbody").innerHTML = d.regions.map(r => `
+        <tr>
+          <td>${esc(r.region)}</td>
+          <td>${r.transactions}</td>
+          <td>${(r.transactions / total * 100).toFixed(1)}%</td>
+        </tr>`).join("");
+
+      document.querySelector("#statusTable tbody").innerHTML = d.alerts_by_status.length
+        ? d.alerts_by_status.map(r => `
+            <tr>
+              <td><span class="chip ${esc(r.review_status)}">${esc(r.review_status.replace("_", " "))}</span></td>
+              <td>${r.alerts}</td>
+            </tr>`).join("")
+        : "<tr><td colspan='2'>No alerts for this account</td></tr>";
+
+      const tx = await (await fetch("/transactions?account_id=" + encodeURIComponent(id) + "&limit=10")).json();
+      document.querySelector("#txTable tbody").innerHTML = tx.map(t => `
+        <tr>
+          <td>${t.transaction_id}</td>
+          <td>${esc(t.transaction_datetime.replace("T", " "))}</td>
+          <td>${t.amount.toFixed(2)}</td>
+          <td>${esc(t.transaction_type)}</td>
+          <td>${esc(t.channel)}</td>
+          <td>${esc(t.region)}</td>
+        </tr>`).join("");
+
+      content.classList.remove("hidden");
+    }
+
+        document.getElementById("loadBtn").addEventListener("click", loadAccount);
+
+    document.getElementById("accountId").addEventListener("change", loadAccount);
+
+    async function init() {
+      const accounts = await (await fetch("/accounts?limit=500")).json();
+      document.getElementById("accountId").innerHTML = accounts.map(a =>
+        `<option value="${a.account_id}">Account ${a.account_id} (${esc(a.customer_code)})</option>`
+      ).join("");
+      loadAccount();
+    }
+    init();
+  </script>
+  </script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

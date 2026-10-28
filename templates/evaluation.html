@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluation</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Financial Risk Review Dashboard</h1>
+    {% include "_nav.html" %}
+  </header>
+  <main>
+    <h2>Evaluation of the rules</h2>
+    <p class="note">Compared against the planted anomalies in the synthetic data.
+      A flag means "review this", never "confirmed fraud".</p>
+
+    <div class="cards plain">
+      <div class="card"><h2 id="precision">-</h2><p>Precision</p></div>
+      <div class="card"><h2 id="recall">-</h2><p>Recall</p></div>
+      <div class="card"><h2 id="f1">-</h2><p>F1 score</p></div>
+    </div>
+
+    <div class="panel" style="margin-top: 24px;">
+      <h2>Outcome counts</h2>
+      <div class="matrix">
+        <div class="head"></div>
+        <div class="head">Flagged</div>
+        <div class="head">Not flagged</div>
+
+        <div class="head">Planted anomaly</div>
+        <div class="tp"><span class="num" id="tp">-</span>True positives (caught)</div>
+        <div class="fn"><span class="num" id="fn">-</span>False negatives (missed)</div>
+
+        <div class="head">Normal</div>
+        <div class="fp"><span class="num" id="fp">-</span>False positives (false alarms)</div>
+        <div class="tn"><span class="num" id="tn">-</span>True negatives</div>
+      </div>
+    </div>
+
+    <h2>Alerts by rule</h2>
+    <table id="ruleTable">
+      <thead>
+        <tr><th>Rule(s) triggered</th><th>Alerts</th><th>Average score</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <script>
+    function esc(v) {
+      const d = document.createElement("div");
+      d.textContent = v;
+      return d.innerHTML;
+    }
+
+    async function load() {
+      const ev = await (await fetch("/reports/evaluation")).json();
+      document.getElementById("precision").textContent = ev.precision_pct + "%";
+      document.getElementById("recall").textContent = ev.recall_pct + "%";
+      document.getElementById("f1").textContent = ev.f1_pct + "%";
+      document.getElementById("tp").textContent = ev.true_positives;
+      document.getElementById("fn").textContent = ev.false_negatives;
+      document.getElementById("fp").textContent = ev.false_positives;
+      document.getElementById("tn").textContent = ev.true_negatives;
+
+      const rules = await (await fetch("/reports/alerts-by-rule")).json();
+      document.querySelector("#ruleTable tbody").innerHTML = rules.map(r => `
+        <tr>
+          <td>${esc(r.rule_name)}</td>
+          <td>${r.alerts}</td>
+          <td>${r.avg_score}</td>
+        </tr>`).join("");
+    }
+    load();
+  </script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

@@ -8,7 +8,7 @@ Analyses synthetic financial transactions, calculates transparent risk indicator
 Python, Flask, MySQL, SQLAlchemy, pandas, NumPy, Matplotlib, Chart.js, plain HTML/CSS/JavaScript.
 
 ## Features
-- REST API with 12 routes for transaction import, retrieval, alerts and reports
+- REST API with 19 routes for transaction import, retrieval, alerts and reports
 - Rule-based alerts for unusual amount, high frequency and location change
 - Configurable risk score with documented weights (stored in the `rule_config` table)
 - Review status and reason on every alert, with a review workflow in the web UI
@@ -69,6 +69,13 @@ Suggested demo order: Dashboard, Alerts (change a status), Check transaction (tr
 | GET | `/reports/risk-distribution` | Alert counts by level and status |
 | GET | `/reports/alert-trends` | Alerts per day |
 | GET | `/audit-log` | Newest audit entries |
+| GET | `/accounts` | List accounts |
+| GET | `/accounts/<id>` | Account profile: spending stats, regions, alerts |
+| GET | `/alerts/<id>/history` | Audit trail of one alert |
+| PATCH | `/rules/<name>` | Change a rule's weight, threshold or active flag |
+| GET | `/reports/alerts-by-rule` | Alert counts and average score per rule |
+| GET | `/reports/evaluation` | Precision, recall and F1 from the planted anomalies |
+| GET | `/export/alerts.csv` | Download alerts as CSV |
 
 Callers may send an `X-User` header; it is recorded in the audit and access logs.
 
