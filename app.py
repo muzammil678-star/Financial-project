@@ -616,7 +616,7 @@ def export_alerts():
     writer.writerows(rows)
     return Response(out.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=alerts.csv"})
-
+#project about the fraud detection
 @app.get("/ui")
 # or: @app.route("/ui")
 def ui_home():
