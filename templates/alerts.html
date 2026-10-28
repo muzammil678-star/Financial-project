@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerts</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Financial Risk Review Dashboard</h1>
+    <nav><a href="/ui">Dashboard</a><a href="/ui/alerts">Alerts</a></nav>
+  </header>
+  <main>
+    <label>Status:
+      <select id="statusFilter">
+        <option value="">All</option>
+        <option>PENDING</option>
+        <option>UNDER_REVIEW</option>
+        <option>CLEARED</option>
+        <option>ESCALATED</option>
+      </select>
+    </label>
+    <table id="alertsTable">
+      <thead>
+        <tr>
+          <th>ID</th><th>Account</th><th>Time</th><th>Amount</th><th>Region</th>
+          <th>Score</th><th>Rules</th><th>Reason</th><th>Status</th><th>Change</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <script>
+    const STATUSES = ["PENDING", "UNDER_REVIEW", "CLEARED", "ESCALATED"];
+
+    function esc(v) {
+      const d = document.createElement("div");
+      d.textContent = v;
+      return d.innerHTML;
+    }
+
+    async function loadAlerts() {
+      const status = document.getElementById("statusFilter").value;
+      const url = "/alerts?limit=50" + (status ? "&status=" + status : "");
+      const res = await fetch(url);
+      const alerts = await res.json();
+      const body = document.querySelector("#alertsTable tbody");
+      body.innerHTML = "";
+      alerts.forEach(a => {
+        const options = STATUSES.map(s =>
+          `<option ${s === a.review_status ? "selected" : ""}>${s}</option>`).join("");
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${a.alert_id}</td>
+          <td>${a.account_id}</td>
+          <td>${esc(a.transaction_datetime.replace("T", " "))}</td>
+          <td>${a.amount.toFixed(2)}</td>
+          <td>${esc(a.region)}</td>
+          <td>${a.risk_score}</td>
+          <td>${esc(a.rule_name)}</td>
+          <td>${esc(a.reason)}</td>
+          <td>${esc(a.review_status)}</td>
+          <td><select data-id="${a.alert_id}">${options}</select></td>`;
+        body.appendChild(tr);
+      });
+    }
+
+    document.querySelector("#alertsTable tbody").addEventListener("change", async (e) => {
+      if (e.target.tagName !== "SELECT") return;
+      const res = await fetch("/alerts/" + e.target.dataset.id, {
+        method: "PATCH",
+        headers: {"Content-Type": "application/json", "X-User": "reviewer"},
+        body: JSON.stringify({review_status: e.target.value})
+      });
+      if (res.ok) { loadAlerts(); } else { alert("Update failed"); }
+    });
+
+    document.getElementById("statusFilter").addEventListener("change", loadAlerts);
+    loadAlerts();
+  </script>
+</body>
+</html>

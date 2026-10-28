@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financial Risk Review Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Financial Risk Review Dashboard</h1>
+    <p>Flagged transactions are flagged for review, not confirmed fraud.</p>
+        <nav>
+  <a href="/ui">Dashboard</a>
+  <a href="/ui/alerts">Alerts</a>
+  <a href="/ui/check">Check transaction</a>
+</nav>
+  </header>
+    <main>
+    <div class="cards">
+      <div class="card"><h2 id="total">-</h2><p>Total alerts</p></div>
+      <div class="card"><h2 id="high">-</h2><p>HIGH</p></div>
+      <div class="card"><h2 id="medium">-</h2><p>MEDIUM</p></div>
+      <div class="card"><h2 id="pending">-</h2><p>Pending review</p></div>
+    </div>
+        <div class="charts">
+      <img src="/static/reports/risk_distribution.png" alt="Risk distribution">
+      <img src="/static/reports/alert_trend.png" alt="Alerts per day">
+      <img src="/static/reports/alerts_by_rule.png" alt="Alerts by rule">
+    </div>
+  </main>
+
+  <script>
+    async function loadSummary() {
+      const res = await fetch("/reports/risk-distribution");
+      const data = await res.json();
+      let high = 0, medium = 0, total = 0, pending = 0;
+      data.by_level.forEach(r => {
+        if (r.risk_level === "HIGH") high = r.alerts;
+        if (r.risk_level === "MEDIUM") medium = r.alerts;
+        total += r.alerts;
+      });
+      data.by_status.forEach(r => {
+        if (r.review_status === "PENDING") pending = r.alerts;
+      });
+      document.getElementById("total").textContent = total;
+      document.getElementById("high").textContent = high;
+      document.getElementById("medium").textContent = medium;
+      document.getElementById("pending").textContent = pending;
+    }
+    loadSummary();
+  </script>
+</body>
+</html>
