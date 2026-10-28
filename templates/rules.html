@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rules</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+<body>
+  <header>
+    <h1>Financial Risk Review Dashboard</h1>
+    <nav>
+      <a href="/ui">Dashboard</a>
+      <a href="/ui/alerts">Alerts</a>
+      <a href="/ui/transactions">Transactions</a>
+      <a href="/ui/check">Check transaction</a>
+      <a href="/ui/rules">Rules</a>
+      <a href="/ui/audit">Audit log</a>
+    </nav>
+  </header>
+  <main>
+    <h2>Rules and weights</h2>
+    <p class="note">Risk score = sum of the weights of the rules that fire (maximum 100).
+      A score of 35 or more creates an alert. A score of 65 or more is HIGH.</p>
+    <table id="rulesTable">
+      <thead>
+        <tr><th>Rule</th><th>Weight</th><th>Threshold</th><th>Description</th><th>Active</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <script>
+    function esc(v) {
+      const d = document.createElement("div");
+      d.textContent = v;
+      return d.innerHTML;
+    }
+
+    async function load() {
+      const res = await fetch("/rules");
+      const rows = await res.json();
+      document.querySelector("#rulesTable tbody").innerHTML = rows.map(r => `
+        <tr>
+          <td>${esc(r.rule_name)}</td>
+          <td>${r.weight}</td>
+          <td>${r.threshold}</td>
+          <td>${esc(r.description)}</td>
+          <td>${r.is_active ? "Yes" : "No"}</td>
+        </tr>`).join("");
+    }
+    load();
+  </script>
+</body>
+</html>

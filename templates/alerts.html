@@ -6,10 +6,18 @@
   <title>Alerts</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 <body>
   <header>
     <h1>Financial Risk Review Dashboard</h1>
-    <nav><a href="/ui">Dashboard</a><a href="/ui/alerts">Alerts</a></nav>
+    <nav>
+  <a href="/ui">Dashboard</a>
+  <a href="/ui/alerts">Alerts</a>
+  <a href="/ui/transactions">Transactions</a>
+  <a href="/ui/check">Check transaction</a>
+  <a href="/ui/rules">Rules</a>
+  <a href="/ui/audit">Audit log</a>
+</nav>
   </header>
   <main>
     <label>Status:
@@ -52,16 +60,17 @@
         const options = STATUSES.map(s =>
           `<option ${s === a.review_status ? "selected" : ""}>${s}</option>`).join("");
         const tr = document.createElement("tr");
+                if (a.risk_score >= 65) tr.className = "high-row";
         tr.innerHTML = `
           <td>${a.alert_id}</td>
           <td>${a.account_id}</td>
           <td>${esc(a.transaction_datetime.replace("T", " "))}</td>
           <td>${a.amount.toFixed(2)}</td>
           <td>${esc(a.region)}</td>
-          <td>${a.risk_score}</td>
+                  <td><span class="badge ${a.risk_score >= 65 ? "HIGH" : "MEDIUM"}">${a.risk_score}</span></td>
           <td>${esc(a.rule_name)}</td>
           <td>${esc(a.reason)}</td>
-          <td>${esc(a.review_status)}</td>
+          <td><span class="chip ${esc(a.review_status)}">${esc(a.review_status.replace("_", " "))}</span></td>
           <td><select data-id="${a.alert_id}">${options}</select></td>`;
         body.appendChild(tr);
       });
@@ -74,7 +83,7 @@
         headers: {"Content-Type": "application/json", "X-User": "reviewer"},
         body: JSON.stringify({review_status: e.target.value})
       });
-      if (res.ok) { loadAlerts(); } else { alert("Update failed"); }
+      if (res.ok) { showToast("Status updated"); loadAlerts(); } else { showToast("Update failed", "error"); }
     });
 
     document.getElementById("statusFilter").addEventListener("change", loadAlerts);
