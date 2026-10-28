@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check a transaction</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Financial Risk Review Dashboard</h1>
+    <nav>
+      <a href="/ui">Dashboard</a>
+      <a href="/ui/alerts">Alerts</a>
+      <a href="/ui/check">Check transaction</a>
+    </nav>
+  </header>
+  <main>
+    <div class="panel">
+      <h2>Check a transaction</h2>
+      <div class="form-grid">
+        <label>Account ID <input type="number" id="account_id" value="1" min="1"></label>
+        <label>Amount <input type="number" id="amount" step="0.01" min="0.01"></label>
+        <label>Region
+          <select id="region">
+            <option>North</option><option>South</option><option>East</option>
+            <option>West</option><option>Central</option><option>Overseas</option>
+          </select>
+        </label>
+        <label>Date and time <input type="datetime-local" id="dt"></label>
+        <label>Type
+          <select id="ttype">
+            <option>purchase</option><option>transfer</option>
+            <option>withdrawal</option><option>deposit</option>
+          </select>
+        </label>
+        <label>Channel
+          <select id="channel">
+            <option>online</option><option>pos</option>
+            <option>atm</option><option>mobile</option>
+          </select>
+        </label>
+      </div>
+      <button id="submitBtn">Check transaction</button>
+    </div>
+
+    <div id="result" class="panel hidden"></div>
+  </main>
+
+  <script>
+    function esc(v) {
+      const d = document.createElement("div");
+      d.textContent = v;
+      return d.innerHTML;
+    }
+
+    document.getElementById("submitBtn").addEventListener("click", async () => {
+      const body = {
+        account_id: parseInt(document.getElementById("account_id").value),
+        amount: parseFloat(document.getElementById("amount").value),
+        region: document.getElementById("region").value,
+        transaction_type: document.getElementById("ttype").value,
+        channel: document.getElementById("channel").value
+      };
+      const dt = document.getElementById("dt").value;
+      if (dt) body.transaction_datetime = dt;
+
+      const res = await fetch("/transactions", {
+        method: "POST",
+        headers: {"Content-Type": "application/json", "X-User": "reviewer"},
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      const box = document.getElementById("result");
+      box.classList.remove("hidden");
+
+      if (!res.ok) {
+        const msgs = data.errors ? data.errors.join(", ") : data.error;
+        box.innerHTML = `<h2>Could not check</h2><p class="error">${esc(msgs)}</p>`;
+        return;
+      }
+
+      const flagged = data.flagged_for_review;
+      box.innerHTML = `
+        <h2>Result</h2>
+        <p><span class="badge ${data.risk_level}">${data.risk_level}</span>
+           Risk score: <b>${data.risk_score}</b></p>
+        <p>${flagged
+          ? "Flagged for review (alert " + data.alert_id + ", status " + data.review_status + ")"
+          : "Not flagged"}</p>
+        <p>Rules triggered: ${data.rules_triggered.length ? esc(data.rules_triggered.join(", ")) : "none"}</p>
+        <p>${esc(data.reason || "No unusual patterns found.")}</p>
+        <p>Saved as transaction ${data.transaction_id}</p>`;
+    });
+  </script>
+</body>
+</html>

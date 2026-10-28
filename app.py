@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime
 from decimal import Decimal
-
+from flask import Flask, jsonify, request, render_template
 from flask import send_from_directory
 import numpy as np
 from flask import Flask, jsonify, request
@@ -412,6 +412,22 @@ def alerts_by_rule_chart():
     return send_from_directory(
         "reports", "alerts_by_rule.png"
     )
+
+@app.get("/ui")
+# or: @app.route("/ui")
+def ui_home():
+    return render_template("index.html")
+
+@app.get("/ui/alerts")
+# or: @app.route("/ui/alerts")
+def ui_alerts():
+    return render_template("alerts.html")
+
+@app.get("/ui/check")
+# or: @app.route("/ui/check")
+def ui_check():
+    return render_template("check.html")
+
 
 if __name__ == "__main__":
     app.run(debug=True)
