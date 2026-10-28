@@ -6,14 +6,18 @@
   <title>Financial Risk Review Dashboard</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 <body>
   <header>
     <h1>Financial Risk Review Dashboard</h1>
     <p>Flagged transactions are flagged for review, not confirmed fraud.</p>
-        <nav>
+       <nav>
   <a href="/ui">Dashboard</a>
   <a href="/ui/alerts">Alerts</a>
+  <a href="/ui/transactions">Transactions</a>
   <a href="/ui/check">Check transaction</a>
+  <a href="/ui/rules">Rules</a>
+  <a href="/ui/audit">Audit log</a>
 </nav>
   </header>
     <main>
@@ -23,13 +27,13 @@
       <div class="card"><h2 id="medium">-</h2><p>MEDIUM</p></div>
       <div class="card"><h2 id="pending">-</h2><p>Pending review</p></div>
     </div>
-        <div class="charts">
-      <img src="/static/reports/risk_distribution.png" alt="Risk distribution">
-      <img src="/static/reports/alert_trend.png" alt="Alerts per day">
-      <img src="/static/reports/alerts_by_rule.png" alt="Alerts by rule">
+            <div class="charts">
+      <div class="chart-box"><h3>Alerts by risk level</h3><canvas id="levelChart"></canvas></div>
+      <div class="chart-box"><h3>Alerts by review status</h3><canvas id="statusChart"></canvas></div>
+      <div class="chart-box wide"><h3>Alerts per day</h3><canvas id="trendChart"></canvas></div>
     </div>
   </main>
-
+    <script src="{{ url_for('static', filename='chart.min.js') }}"></script>
   <script>
     async function loadSummary() {
       const res = await fetch("/reports/risk-distribution");
@@ -49,6 +53,53 @@
       document.getElementById("pending").textContent = pending;
     }
     loadSummary();
+        async function drawCharts() {
+      const dist = await (await fetch("/reports/risk-distribution")).json();
+      const trend = await (await fetch("/reports/alert-trends")).json();
+
+      new Chart(document.getElementById("levelChart"), {
+        type: "doughnut",
+        data: {
+          labels: dist.by_level.map(r => r.risk_level),
+          datasets: [{
+            data: dist.by_level.map(r => r.alerts),
+            backgroundColor: dist.by_level.map(r => r.risk_level === "HIGH" ? "#c62828" : "#ef6c00")
+          }]
+        },
+        options: { plugins: { legend: { position: "bottom" } } }
+      });
+
+      new Chart(document.getElementById("statusChart"), {
+        type: "bar",
+        data: {
+          labels: dist.by_status.map(r => r.review_status),
+          datasets: [{
+            label: "Alerts",
+            data: dist.by_status.map(r => r.alerts),
+            backgroundColor: "#2f5fd0",
+            borderRadius: 6
+          }]
+        },
+        options: { plugins: { legend: { display: false } } }
+      });
+
+      new Chart(document.getElementById("trendChart"), {
+        type: "line",
+        data: {
+          labels: trend.map(r => r.alert_date),
+          datasets: [{
+            label: "Alerts",
+            data: trend.map(r => r.alerts),
+            borderColor: "#2f5fd0",
+            backgroundColor: "rgba(47, 95, 208, 0.15)",
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: { plugins: { legend: { display: false } } }
+      });
+    }
+    drawCharts();
   </script>
 </body>
 </html>

@@ -27,3 +27,5 @@ Small database + API backend built with Flask and MySQL.
 - Never push directly to `main`. Create a branch, push it, and open a Pull Request
 - Never commit `.env`
 - Pull the latest `main` before starting new work
+
+## Added front end pages with interactive looks

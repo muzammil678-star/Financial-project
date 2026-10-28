@@ -428,6 +428,22 @@ def ui_alerts():
 def ui_check():
     return render_template("check.html")
 
+@app.get("/ui/transactions")
+# or: @app.route("/ui/transactions")
+def ui_transactions():
+    return render_template("transactions.html")
+
+
+@app.get("/ui/rules")
+# or: @app.route("/ui/rules")
+def ui_rules():
+    return render_template("rules.html")
+
+
+@app.get("/ui/audit")
+# or: @app.route("/ui/audit")
+def ui_audit():
+    return render_template("audit.html")
 
 if __name__ == "__main__":
     app.run(debug=True)

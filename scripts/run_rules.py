@@ -40,11 +40,8 @@ ts = df["ts"].to_numpy()
 freq = np.zeros(len(df), dtype=int)
 for idx in df.groupby("account_id").indices.values():
     t = ts[idx]
-    freq[idx] = (
-    np.arange(len(t))
-    - np.searchsorted(t, t - 600, side="left")
-    + 1
-)
+    freq[idx] = (np.searchsorted(t, t + 600, side="right")
+                 - np.searchsorted(t, t - 600, side="left"))
 df["freq10"] = freq
 f_freq = df["freq10"] >= T["HIGH_FREQUENCY"]
 
