@@ -453,7 +453,7 @@ def get_account(account_id):
             FROM transactions
             WHERE account_id = :id
         """), {"id": account_id}).mappings().first()
-
+#hello
         regions = conn.execute(text("""
             SELECT region, COUNT(*) AS transactions
             FROM transactions
@@ -473,13 +473,14 @@ def get_account(account_id):
     stats = clean(stats)
     if stats["avg_amount"] is not None:
         stats["avg_amount"] = round(stats["avg_amount"], 2)
+    #hello
     return jsonify(
         account=clean(account),
         stats=stats,
         regions=[clean(r) for r in regions],
         alerts_by_status=[clean(r) for r in alerts],
     )
-
+#hello
 
 # ---------- 3. GET /alerts/<id>/history ----------
 @app.get("/alerts/<int:alert_id>/history")
@@ -500,6 +501,7 @@ def alert_history(alert_id):
 # ---------- 4. PATCH /rules/<name> ----------
 @app.patch("/rules/<rule_name>")
 # or: @app.route("/rules/<rule_name>", methods=["PATCH"])
+#hello
 def update_rule(rule_name):
     body = request.get_json(silent=True) or {}
     changes, errors = [], []
@@ -545,7 +547,7 @@ def update_rule(rule_name):
               f"threshold {float(before['threshold'] or 0)}->{float(after['threshold'] or 0)}, "
               f"active {before['is_active']}->{after['is_active']}")
     return jsonify(clean(after))
-
+#hello
 
 # ---------- 5. GET /reports/alerts-by-rule ----------
 @app.get("/reports/alerts-by-rule")
@@ -557,12 +559,14 @@ def alerts_by_rule():
         GROUP BY rule_name
         ORDER BY alerts DESC
     """)
+#hello
     with engine.connect() as conn:
         rows = conn.execute(sql).mappings().all()
     result = [clean(r) for r in rows]
     for r in result:
         r["avg_score"] = round(r["avg_score"], 1)
     return jsonify(result)
+#hello
 
 
 # ---------- 6. GET /reports/evaluation ----------
